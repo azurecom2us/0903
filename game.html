@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARES - 機甲輪切 QTE 挑戰賽</title>
+  <style>
+    :root {
+      --bg-color: #080b12;
+      --card-bg: rgba(18, 24, 38, 0.95);
+      --accent-color: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.4);
+      --text-color: #e2e8f0;
+      --text-dim: #94a3b8;
+      --gold: #ffd700;
+      --danger: #ff0055;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 20px;
+      background-image: radial-gradient(circle at center, rgba(0,240,255,0.05) 0%, transparent 70%);
+    }
+
+    .game-card {
+      width: 100%; max-width: 600px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent-color);
+      box-shadow: 0 0 25px var(--accent-glow);
+      border-radius: 12px; padding: 25px;
+      text-align: center; backdrop-filter: blur(10px);
+      position: relative; overflow: hidden;
+    }
+
+    .hidden { display: none !important; }
+
+    h1 { color: var(--accent-color); font-size: 1.8rem; margin-bottom: 10px; letter-spacing: 2px; }
+    p { color: var(--text-dim); line-height: 1.5; font-size: 0.95rem; }
+
+    /* 遊戲儀表板 */
+    .hud {
+      display: flex; justify-content: space-between;
+      margin: 15px 0; font-weight: bold; font-size: 1.1rem;
+      background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 6px;
+    }
+    .hud-val { color: var(--accent-color); }
+
+    /* BOSS 舞台區與動態效果 */
+    .boss-area {
+      height: 260px; border: 1px solid rgba(0,240,255,0.2);
+      border-radius: 8px; margin: 15px 0;
+      display: flex; flex-direction: column;
+      justify-content: space-between; align-items: center;
+      background: radial-gradient(circle at center, rgba(20, 30, 50, 0.8) 0%, rgba(5, 8, 15, 0.9) 100%);
+      position: relative; overflow: hidden; padding: 15px;
+    }
+
+    .boss-img-container {
+      position: absolute;
+      top: 35px;
+      width: 170px;
+      height: 170px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1;
+    }
+
+    .boss-img {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3));
+      animation: bossBreathing 2.5s ease-in-out infinite alternate;
+    }
+
+    /* BOSS 動畫定義 */
+    @keyframes bossBreathing {
+      0% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.3)); }
+      100% { transform: translateY(-8px) scale(1.03); filter: drop-shadow(0 0 18px rgba(0, 240, 255, 0.6)); }
+    }
+
+    .boss-attack {
+      animation: bossAttack 0.3s ease-in-out infinite alternate !important;
+    }
+
+    @keyframes bossAttack {
+      0% { transform: scale(1.05) translate(0, 0); filter: drop-shadow(0 0 20px var(--danger)); }
+      50% { transform: scale(1.1) translate(-4px, 3px); }
+      100% { transform: scale(1.08) translate(4px, -3px); filter: drop-shadow(0 0 25px var(--danger)); }
+    }
+
+    .boss-hit {
+      animation: bossHit 0.3s ease-out !important;
+    }
+
+    @keyframes bossHit {
+      0% { transform: scale(0.9) translateY(10px); filter: brightness(2) drop-shadow(0 0 30px var(--accent-color)); }
+      100% { transform: scale(1) translateY(0); }
+    }
+
+    .boss-warning {
+      font-size: 1rem; color: var(--gold); font-weight: bold; z-index: 2;
+      text-shadow: 0 0 8px rgba(0,0,0,0.8);
+    }
+
+    .qte-target {
+      font-size: 1.25rem; font-weight: bold; color: #fff;
+      padding: 8px 16px; border-radius: 6px;
+      border: 2px solid var(--accent-color);
+      box-shadow: 0 0 15px var(--accent-glow);
+      background: rgba(10, 15, 25, 0.85);
+      z-index: 2;
+      animation: pulse 0.6s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.04); }
+    }
+
+    .feedback {
+      position: absolute; top: 45%; font-size: 2.2rem; font-weight: 900;
+      font-style: italic; pointer-events: none; opacity: 0; z-index: 3;
+      transition: all 0.25s ease; text-shadow: 0 0 10px #000;
+    }
+
+    /* 控制按鈕 */
+    .mecha-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(0,240,255,0.3);
+      color: var(--text-color); padding: 12px; border-radius: 6px;
+      font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.15s;
+    }
+
+    .btn:hover { background: var(--accent-color); color: #000; box-shadow: 0 0 12px var(--accent-glow); }
+    .btn:active { transform: scale(0.96); }
+
+    .btn-action {
+      width: 100%; background: var(--accent-color); color: #000;
+      font-size: 1.1rem; margin-top: 15px; padding: 14px;
+    }
+
+    /* 結算頁按鈕區 */
+    .result-score { font-size: 2.5rem; color: var(--gold); margin: 10px 0; font-weight: bold; }
+    .result-rank { font-size: 1.2rem; color: var(--accent-color); margin-bottom: 20px; }
+
+    .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .btn-gift { background: linear-gradient(90deg, #ff0055, #ff5500); border: none; color: white; }
+    .btn-gift:hover { box-shadow: 0 0 15px rgba(255,0,85,0.5); }
+    .btn-share { background: linear-gradient(90deg, #00f0ff, #7000ff); border: none; color: white; }
+    .btn-share:hover { box-shadow: 0 0 15px rgba(112,0,255,0.5); }
+  </style>
+</head>
+<body>
+
+  <div class="game-card">
+    <!-- 1. 開始畫面 -->
+    <div id="screen-start">
+      <h1>機甲輪切 QTE 挑戰賽</h1>
+      <p>機械巨獸 Boss 襲來！根據出現的戰局危機，在 30 秒內迅速按下對應的機甲按鈕實施「Suit Change 防禦反擊」，獲取最高積分！</p>
+      <button class="btn btn-action" onclick="startGame()">啟動戰術連結 (START)</button>
+    </div>
+
+    <!-- 2. 遊戲進行中畫面 -->
+    <div id="screen-game" class="hidden">
+      <div class="hud">
+        <div>剩餘時間：<span id="timer" class="hud-val">30</span>s</div>
+        <div>反擊積分：<span id="score" class="hud-val">0</span></div>
+      </div>
+
+      <div class="boss-area">
+        <div id="feedback" class="feedback">PERFECT!</div>
+        <div class="boss-warning" id="boss-warning">【WARNING】 Boss 發動致命打擊！</div>
+        
+        <!-- BOSS 動態圖片容器（已修改為 BOSS.PNG） -->
+        <div class="boss-img-container">
+          <img id="boss-img" class="boss-img" src="BOSS.PNG" alt="Boss">
+        </div>
+
+        <div class="qte-target" id="qte-target">需要：戰士 (Warlord) 扛下打擊</div>
+      </div>
+
+      <div class="mecha-grid">
+        <button class="btn" onclick="checkQTE('warlord')">🛡️ 戰士 (Warlord)</button>
+        <button class="btn" onclick="checkQTE('hunter')">⚔️ 獵人 (Hunter)</button>
+        <button class="btn" onclick="checkQTE('warlock')">🔮 術士 (Warlock)</button>
+        <button class="btn" onclick="checkQTE('engineer')">💥 工程師 (Engineer)</button>
+      </div>
+    </div>
+
+    <!-- 3. 結算畫面 -->
+    <div id="screen-result" class="hidden">
+      <h1>戰術評估完成</h1>
+      <div class="result-score" id="final-score">0 PTS</div>
+      <div class="result-rank" id="final-rank">評級：S 級守護者</div>
+
+      <div class="btn-group">
+        <button class="btn btn-gift" onclick="claimGift()">🎁 領取專屬開服禮包</button>
+        <button class="btn btn-share" onclick="shareResult()">📢 分享戰績至社群</button>
+        <button class="btn" onclick="resetGame()" style="margin-top: 5px;">🔄 再次挑戰</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const prompts = [
+      { key: 'warlord', text: 'Boss 釋放致命霸體重擊！', req: '切換：戰士 (扛傷反擊)' },
+      { key: 'hunter', text: 'Boss 露出背後弱點空檔！', req: '切換：獵人 (高速斬擊)' },
+      { key: 'warlock', text: '敵方大軍湧入戰場！', req: '切換：術士 (大範圍元素清場)' },
+      { key: 'engineer', text: '極端惡劣戰況需要強行控場！', req: '切換：工程師 (浮游砲地毯轟炸)' }
+    ];
+
+    let currentPrompt = null;
+    let score = 0;
+    let timeLeft = 30;
+    let timerInterval = null;
+
+    function startGame() {
+      score = 0;
+      timeLeft = 30;
+      document.getElementById('score').innerText = score;
+      document.getElementById('timer').innerText = timeLeft;
+
+      document.getElementById('screen-start').classList.add('hidden');
+      document.getElementById('screen-result').classList.add('hidden');
+      document.getElementById('screen-game').classList.remove('hidden');
+
+      nextQTE();
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+    }
+
+    function nextQTE() {
+      const randomIndex = Math.floor(Math.random() * prompts.length);
+      currentPrompt = prompts[randomIndex];
+      document.getElementById('boss-warning').innerText = `【WARNING】 ${currentPrompt.text}`;
+      document.getElementById('qte-target').innerText = currentPrompt.req;
+
+      const bossImg = document.getElementById('boss-img');
+      bossImg.classList.add('boss-attack');
+    }
+
+    function checkQTE(type) {
+      if (timeLeft <= 0) return;
+
+      const bossImg = document.getElementById('boss-img');
+      bossImg.classList.remove('boss-attack');
+
+      if (type === currentPrompt.key) {
+        score += 100;
+        document.getElementById('score').innerText = score;
+        showFeedback('COUNTER!!', '#00f0ff');
+        
+        bossImg.classList.add('boss-hit');
+        setTimeout(() => bossImg.classList.remove('boss-hit'), 300);
+      } else {
+        score = Math.max(0, score - 30);
+        document.getElementById('score').innerText = score;
+        showFeedback('MISS!', '#ff0055');
+      }
+      nextQTE();
+    }
+
+    function showFeedback(text, color) {
+      const fb = document.getElementById('feedback');
+      fb.innerText = text;
+      fb.style.color = color;
+      fb.style.opacity = '1';
+      fb.style.transform = 'scale(1.2)';
+      setTimeout(() => {
+        fb.style.opacity = '0';
+        fb.style.transform = 'scale(1)';
+      }, 250);
+    }
+
+    function endGame() {
+      clearInterval(timerInterval);
+      document.getElementById('screen-game').classList.add('hidden');
+      document.getElementById('screen-result').classList.remove('hidden');
+
+      document.getElementById('final-score').innerText = `${score} PTS`;
+      
+      let rank = 'C 級守護者';
+      if (score >= 1200) rank = 'SSS 級傳奇守護者';
+      else if (score >= 900) rank = 'SS 級核心守護者';
+      else if (score >= 600) rank = 'S 級合格守護者';
+      else if (score >= 300) rank = 'A 級新兵守護者';
+      
+      document.getElementById('final-rank').innerText = `綜合評級：${rank}`;
+    }
+
+    function resetGame() {
+      document.getElementById('screen-result').classList.add('hidden');
+      document.getElementById('screen-start').classList.remove('hidden');
+    }
+
+    function claimGift() {
+      const giftCode = 'ARES-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      alert(`🎁 領取成功！\n您的專屬開服禮包碼為：${giftCode}\n（遊戲上市後可在兌換中心輸入領取）`);
+    }
+
+    function shareResult() {
+      const shareText = `我在《ARES》機甲輪切 QTE 挑戰賽獲得了 ${score} 分！快來測試你的反擊反應力！`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareText);
+        alert('📢 戰績已複製到剪貼簿，快分享給朋友吧！');
+      } else {
+        alert(shareText);
+      }
+    }
+  </script>
+</body>
+</html>
